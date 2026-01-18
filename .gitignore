@@ -2,4 +2,5 @@ x86_64-*
 *.7z
 *.dts
 *.dtb
+*.elf
 *.txt

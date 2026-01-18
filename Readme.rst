@@ -1,6 +1,6 @@
-####################################################
-Playing with Bare Metal RISC-V, QEMU, GCC and Pico 2
-####################################################
+#######################################
+Bare Metal RISC-V, QEMU, GCC and Pico 2
+#######################################
 
 :date: 2025-01-18 19:00
 :modified: 2025-01-18 19:00
@@ -67,3 +67,77 @@ Finally, the linker can provide us a default (but too complex) version of the li
 .. code-block:: bash
 
     riscv32-unknown-elf-ld --verbose > qemu-riscv32-vrit.txt
+
+***********************************************
+02: compiling the smallest risc-v code
+***********************************************
+
+The smallest executable code is an infinite loop jumping to the first location in memory
+
+.. code-block:: asm
+
+            .text
+            .global _start
+    _start:
+            j _start
+
+To compile it, we need a small linker script that will explain to the linker where to put the compiled code.
+
+Note that the ram section matches the memory discovered in the first step.
+
+.. code-block::
+
+    OUTPUT_FORMAT("elf32-littleriscv", "elf32-littleriscv", "elf32-littleriscv")
+    OUTPUT_ARCH(riscv)
+    ENTRY(_start)
+
+    MEMORY
+    {
+        ram   (wxa!ri) : ORIGIN = 0x80000000, LENGTH = 128M
+    }
+
+    PHDRS
+    {
+        text PT_LOAD;
+    }
+
+    SECTIONS
+    {
+        .text : {
+            *(.text.init) *(.text .text.*)
+        } >ram AT>ram :text
+    }
+
+To create an application:
+
+.. code-block:: bash
+
+    riscv32-unknown-elf-gcc -o 02.elf start.s -nostartfiles -Wl,-Tlinker.ld
+
+And to verify the result:
+
+.. code-block:: bash
+
+    riscv32-unknown-elf-objdump -d -s -j .text 02.elf
+    riscv32-unknown-elf-size 02.elf
+
+Which prints the following output:
+
+.. code-block:: bash
+
+    $ ./02/build.sh
+
+    02.elf:     file format elf32-littleriscv
+
+    Contents of section .text:
+    80000000 01a0                                 ..              
+
+    Disassembly of section .text:
+
+    80000000 <_start>:
+    80000000:       a001                    j       80000000 <_start>
+    text    data     bss     dec     hex filename
+        2       0       0       2       2 02.elf
+
+Nice! 2 bytes only! ;-) But totally useless.
+

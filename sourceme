@@ -13,7 +13,7 @@ if [ "$OSTYPE" == "linux-gnu" ]; then
             rm -f "$GCC.7z"
         )
     fi
-    PATH="$(dirname "${BASH_SOURCE[0]}")/$GCC/bin:$PATH"
+    PATH="$(realpath "$(dirname "${BASH_SOURCE[0]}")/$GCC/bin"):$PATH"
 else
     echo "Unsupported OS: OSTYPE=$OSTYPE"
 fi
