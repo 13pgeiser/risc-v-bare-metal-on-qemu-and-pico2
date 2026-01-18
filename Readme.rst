@@ -232,3 +232,30 @@ Running the binary does not show anything fancy but exits immediatly.
 .. code-block:: bash
 
     qemu-system-riscv32 -M virt -nographic -kernel 04.elf -bios none -semihosting
+
+**************************
+05: Jump to main in C Code
+**************************
+
+To jump to C main function, the linker script gets slightly more complex.
+
+It handles the standard sections that are expected in a c program:
+ * .text : the program code
+ * .rodata: the read-only initialized constants
+ * .data: the writable initialized constants
+ * .bss: the variables not initialized.
+
+Jumping to C means setting up the stack (even if we do not use it yet in this example).
+To do so, some memory space is reserved at the end of the bss section.
+
+The assembly code has very little changes:
+
+.. code-block:: asm
+
+    ...
+    _start:
+            la sp, stack_top
+            jal main
+    ...
+
+Returning from main will call the semihosting code SYS_EXIT and stop QEMU.
