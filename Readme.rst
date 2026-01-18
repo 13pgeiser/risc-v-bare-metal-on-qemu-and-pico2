@@ -189,3 +189,46 @@ Then in the same gdb run:
     (gdb) info register pc
     pc             0x80000000       0x80000000
     (gdb)
+
+*************************************************
+04: The smallest program that exists QEMU cleanly
+*************************************************
+
+To do that, we will use `Semihosting <https://www.qemu.org/docs/master/about/emulation.html#semihosting>`__.
+
+The `riscv-semihosting <https://github.com/riscv-non-isa/riscv-semihosting/blob/main/src/binary-interface.adoc>`__ sequence:
+
+.. code-block:: asm
+
+    slli x0, x0, 0x1f   # 0x01f01013   Entry NOP
+    ebreak              # 0x00100073   Break to debugger
+    srai x0, x0, 7      # 0x40705013   NOP encoding the semihosting call number 7
+
+These instructions must be encoded using 32 bits opcodes thus the ".option norvc" in the assembly code:
+
+.. code-block:: asm
+
+            .text
+            .global _start
+    _start:
+            li a0, 0x18 # SYS_EXIT
+            li a1, 0
+            jal sys_semihost
+
+            .balign 16
+            .option norvc
+            .text
+            .global sys_semihost
+    sys_semihost:
+            slli zero, zero, 0x1f
+            ebreak
+            srai zero, zero, 0x7
+            ret
+
+The registers a0, a1 are encoding the operation and the parameter respectively.
+
+Running the binary does not show anything fancy but exits immediatly.
+
+.. code-block:: bash
+
+    qemu-system-riscv32 -M virt -nographic -kernel 04.elf -bios none -semihosting
