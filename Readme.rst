@@ -141,3 +141,51 @@ Which prints the following output:
 
 Nice! 2 bytes only! ;-) But totally useless.
 
+
+************************************
+03: Running our (useless) executable
+************************************
+
+.. code-block:: bash
+
+    source ../sourceme
+    qemu-system-riscv32 -M virt -s -S -nographic -kernel 02.elf -bios none
+
+This tell qemu to: (see https://www.qemu.org/docs/master/system/invocation.html for more information):
+ * '-s': Shorthand for -gdb tcp::1234
+ * '-S': Do not start CPU at startup
+ * '-nographic': disable windowing system
+ * '-kernel' 02.elf : loads our binary
+ * '-bios none': get rid of the default bios
+
+And in a second terminal:
+
+.. code-block:: bash
+
+    source ../sourceme
+    riscv32-unknown-elf-gdb virt --eval-command="target remote :1234" --eval-command="x/8xw 0x80000000"
+
+Which will connect with gdb to the stopped binary and dump the memory at 0x80000000 (RAM)
+
+.. code-block::
+
+    ...
+    0x00001000 in ?? ()
+    0x80000000:     0x0000a001      0x00000000      0x00000000      0x00000000
+    0x80000010:     0x00000000      0x00000000      0x00000000      0x00000000
+
+Then in the same gdb run:
+ * 'c': to continue execution
+ * 'ctrl-c': to break
+ * 'info register pc' (or 'i r pc'): to show the current program counter
+
+.. code-block::
+
+    (gdb) c
+    Continuing.
+
+    Program received signal SIGINT, Interrupt.
+    0x80000000 in ?? ()
+    (gdb) info register pc
+    pc             0x80000000       0x80000000
+    (gdb)
