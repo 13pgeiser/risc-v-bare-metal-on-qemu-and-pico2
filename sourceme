@@ -1,0 +1,19 @@
+#!/bin/sh
+CURL="curl -L -O"
+if [ "$OSTYPE" == "linux-gnu" ]; then
+    # Download gcc for riscv32 and put it in the PATH
+    GCC="x86_64-linux-gnu_riscv32-unknown-elf-15.1.0"
+    if [ ! -d "$(dirname "${BASH_SOURCE[0]}")/$GCC/bin/" ]; then
+        # should check specifically for apt
+        sudo apt install qemu-system-misc qemu-system-data device-tree-compiler p7zip
+        (
+            cd $(dirname "${BASH_SOURCE[0]}")
+            $CURL "https://github.com/13pgeiser/gcc-riscv32/releases/download/gcc_15.1.0_binutils_2.44/$GCC.7z"
+            7zr x "$GCC.7z"
+            rm -f "$GCC.7z"
+        )
+    fi
+    PATH="$(dirname "${BASH_SOURCE[0]}")/$GCC/bin:$PATH"
+else
+    echo "Unsupported OS: OSTYPE=$OSTYPE"
+fi
