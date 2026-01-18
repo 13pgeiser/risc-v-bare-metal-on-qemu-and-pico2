@@ -319,3 +319,47 @@ Result:
     text    data     bss     dec     hex filename
      163    3933       0    4096    1000 06.elf
     Hello from RISC-V virtual implementation running in QEMU!
+
+********************
+07: Integrate Newlib
+********************
+
+To link with newlib, it's enough to pass "-lc" and "-nostdlib" to the compiler command line.
+The effect of "-nostdlib" is to pass only the specified libraries to the linker, avoiding any startup and initialization code.
+
+.. code-block:: bash
+
+    riscv32-unknown-elf-gcc -Os -o 07.elf start.s main.c -nostartfiles -Wl,-Tlinker.ld -nostdlib -lc
+
+Doing so will generate a bunch of undefined references to
+`System Calls <https://sourceware.org/newlib/libc.html#Syscalls>`__ required by newlib.
+In our case, a simple implementation of almost all of them is easy to provide.
+
+Two calls require a bit more attention:
+ * `_write` which will be redirected to the UART
+ * `_sbrk` which increase program data space
+
+Finally, Newlib comes with a "nano" flavor. A stripped down version of Newlib focusing on memory
+size by simplifying the code and removing some rarely used features in small embedded systems.
+
+To link with Newlib nano, the following flags have to be used: "-specs=nano.specs -lc_nano"
+
+.. code-block:: bash
+
+    riscv32-unknown-elf-gcc -Os -o 07.elf start.s 07.c -nostartfiles -Wl,-Tlinker.ld -nostdlib -specs=nano.specs -lc_nano
+
+The final results are aroung 8kb of code for newlib and 4kb for newlib nano:
+
+.. code-block:: bash
+
+    $ ./07/build.sh
+
+    text    data     bss     dec     hex filename
+    8452    1376     376   10204    27dc 07.elf
+    Hello from RISC-V virtual implementation running in QEMU!
+
+
+
+    text    data     bss     dec     hex filename
+    4225      92     332    4649    1229 07.elf
+    Hello from RISC-V virtual implementation running in QEMU!
