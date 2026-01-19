@@ -363,3 +363,141 @@ The final results are aroung 8kb of code for newlib and 4kb for newlib nano:
     text    data     bss     dec     hex filename
     4225      92     332    4649    1229 07.elf
     Hello from RISC-V virtual implementation running in QEMU!
+
+*****************************
+08: Running on Pico2 (in ram)
+*****************************
+
+The RP2350 contains 2 `Hazard3 <https://github.com/Wren6991/Hazard3>`__ RISC-V cores.
+To use the RISC-V cores, the bootloader has to find a metadatablock, to configure the cores.
+See `rp2350-datasheet <https://pip-assets.raspberrypi.com/categories/1214-rp2350/documents/RP-008373-DS-2-rp2350-datasheet.pdf?disposition=inline>`__
+chapter 5.9.
+
+.. code-block:: asm
+
+    .section .bootloader_metadata, "a"
+    bootloader_metadata:
+    .word 0xffffded3
+    .word 0x11010142
+    .word 0x00000344
+    .word _start	        # Initial PC address
+    .word 0x20082000	# Initial SP address
+    .word 0x000004ff
+    .word 0x00000000
+    .word 0xab123579
+
+The linker script is used to place it at the beginning of the binary:
+
+.. code-block::
+
+    .text : {
+        KEEP (*(.bootloader_metadata))
+        *(.text.init) *(.text .text.*)
+    } >ram AT>ram :text
+
+The configuration of the UART requires correct clock setup.
+setup_clocks starts the XOSC and configures the PLL first.
+
+.. code-block:: c
+
+    #define XOSC_BASE    0x40048000
+    #define XOSC_CTRL    (*(volatile uint32_t *)(XOSC_BASE + 0x00))
+    #define XOSC_STATUS  (*(volatile uint32_t *)(XOSC_BASE + 0x04))
+    #define XOSC_STARTUP (*(volatile uint32_t *)(XOSC_BASE + 0x0c))
+
+    #define RESETS_BASE       0x40020000
+    #define RESETS_RESET      (*(volatile uint32_t *)(RESETS_BASE + 0x00))
+    #define RESETS_RESET_DONE (*(volatile uint32_t *)(RESETS_BASE + 0x08))
+
+    #define PLL_SYS_BASE      0x40050000
+    #define PLL_SYS_CS        (*(volatile uint32_t *)(PLL_SYS_BASE + 0x00))
+    #define PLL_SYS_PWR       (*(volatile uint32_t *)(PLL_SYS_BASE + 0x04))
+    #define PLL_SYS_FBDIV_INT (*(volatile uint32_t *)(PLL_SYS_BASE + 0x08))
+    #define PLL_SYS_PRIM      (*(volatile uint32_t *)(PLL_SYS_BASE + 0x0c))
+
+    #define CLOCKS_BASE             0x40010000
+    #define CLOCKS_CLK_REF_CTRL     (*(volatile uint32_t *)(CLOCKS_BASE + 0x30))
+    #define CLOCKS_CLK_REF_SELECTED (*(volatile uint32_t *)(CLOCKS_BASE + 0x38))
+    #define CLOCKS_CLK_SYS_CTRL     (*(volatile uint32_t *)(CLOCKS_BASE + 0x3c))
+    #define CLOCKS_CLK_SYS_SELECTED (*(volatile uint32_t *)(CLOCKS_BASE + 0x44))
+    #define CLOCKS_CLK_PERI_CTRL    (*(volatile uint32_t *)(CLOCKS_BASE + 0x48))
+
+    void setup_clocks(void) {
+        XOSC_STARTUP = (XOSC_STARTUP & ~0x00003fff) | 469;
+        XOSC_CTRL = (XOSC_CTRL & ~0x00ffffff) | 0xfabaa0;
+        while (!(XOSC_STATUS & (1U << 31)));
+        RESETS_RESET &= ~(1u << 14);
+        while (!(RESETS_RESET_DONE & (1 << 14)));
+        PLL_SYS_FBDIV_INT = (PLL_SYS_FBDIV_INT & ~0x00000fff) | 125;
+        PLL_SYS_PWR &= ~((1 << 5) | (1 << 0));
+        while (!(PLL_SYS_CS & (1U << 31)));
+        PLL_SYS_PRIM = (PLL_SYS_PRIM & ~0x00077000) | (5 << 16) | (2 << 12);
+        PLL_SYS_PWR &= ~(1 << 3);
+        CLOCKS_CLK_REF_CTRL = (CLOCKS_CLK_REF_CTRL & ~0x00000003) | 0x2;
+        while (!(CLOCKS_CLK_REF_SELECTED & 0x00f) == 0b0100);
+        CLOCKS_CLK_SYS_CTRL = (0x0 << 5) | (0x1 << 0);
+        while (!(CLOCKS_CLK_SYS_SELECTED & (1 << 1)));
+    }
+
+Then, the UART0 has to be configured.
+
+.. code-block:: c
+
+    // RP2350 Specific Base Addresses
+    #define UART0_BASE       0x40070000
+    #define RESETS_BASE      0x40020000
+    #define IO_BANK0_BASE    0x40028000
+    #define PADS_BANK0_BASE  0x40038000
+
+    // UART Registers (PL011)
+    #define UART_DR          (*(volatile uint32_t *)(UART0_BASE + 0x00))
+    #define UART_FR          (*(volatile uint32_t *)(UART0_BASE + 0x18))
+    #define UART_IBRD        (*(volatile uint32_t *)(UART0_BASE + 0x24))
+    #define UART_FBRD        (*(volatile uint32_t *)(UART0_BASE + 0x28))
+    #define UART_LCR_H       (*(volatile uint32_t *)(UART0_BASE + 0x2c))
+    #define UART_CR          (*(volatile uint32_t *)(UART0_BASE + 0x30))
+
+    // Reset Control Registers
+    #define RESET_CTRL       (*(volatile uint32_t *)(RESETS_BASE + 0x00))
+    #define RESET_DONE       (*(volatile uint32_t *)(RESETS_BASE + 0x08))
+
+    // GPIO & Pad Control
+    #define GPIO0_CTRL       (*(volatile uint32_t *)(IO_BANK0_BASE + 0x04))
+    #define GPIO1_CTRL       (*(volatile uint32_t *)(IO_BANK0_BASE + 0x0c))
+    #define PAD_GPIO0        (*(volatile uint32_t *)(PADS_BANK0_BASE + 0x04))
+    #define PAD_GPIO1        (*(volatile uint32_t *)(PADS_BANK0_BASE + 0x08))
+
+    void uart_init_rp2350() {
+    CLOCKS_CLK_PERI_CTRL = (1 << 11); // ENABLE bit
+    // Release Resets: UART0 (bit 26), IO_BANK0 (bit 6), PADS_BANK0 (bit 9)
+    uint32_t mask = (1 << 26) | (1 << 6) | (1 << 9);
+    RESET_CTRL &= ~mask;
+    while ((RESET_DONE & mask) != mask);
+    // Disable UART before configuration
+    UART_CR = 0;
+    // Configure PADS (Physical Electrical Properties)
+    PAD_GPIO0 = 0x30;
+    // Set GPIO Function 2 (UART0)
+    GPIO0_CTRL = 2;
+    // Baud Rate: 115200 at 150MHz clk_peri
+    // Divisor = 150,000,000 / (16 * 115200) = 81.3802
+    UART_IBRD = 81;
+    UART_FBRD = 24;
+    // Setup Line Control & Enable (8N1, FIFOs Enabled)
+    UART_LCR_H = (0x3 << 5) | (1 << 4);
+    UART_CR = (1 << 8) | (1 << 0); // TXE, UARTEN
+    }
+
+Finally, writing to the UART is then as easy as:
+
+    while (UART_FR & (1 << 5)); // Wait to be ready
+        UART_DR = <the character to send>; // Send...
+
+The function _write has been modified accordingly.
+
+To upload the program (in ram!!!), we can create a uf2 binary either with picotool or with the great
+python tool from https://github.com/dougsummerville/Bare-Metal-Raspberry-Pi-Pico-2
+
+Dropping the program 08.uf2 on the RP2350 will trigger the start of the program:
+
+    Hello from RISC-V virtual implementation running on Pico2!

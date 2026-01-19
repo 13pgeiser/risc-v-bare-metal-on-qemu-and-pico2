@@ -4,3 +4,5 @@ x86_64-*
 *.dtb
 *.elf
 *.txt
+*.uf2
+elf2uf2.py
