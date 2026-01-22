@@ -501,3 +501,53 @@ python tool from https://github.com/dougsummerville/Bare-Metal-Raspberry-Pi-Pico
 Dropping the program 08.uf2 on the RP2350 will trigger the start of the program:
 
     Hello from RISC-V virtual implementation running on Pico2!
+
+*******************************
+09: Running on Pico2 (in flash)
+*******************************
+
+The linker is now slightly different. It adds flash:
+
+.. code-block::
+
+    flash  (rx) : ORIGIN = 0x10000000, LENGTH = 4M
+
+And the text sections and rodata are now purely in flash.
+
+For data, the sections is in ram but stored in flash.
+__data_load_ptr contains the source in flash.
+
+.. code-block::
+
+    .data : {
+        . = ALIGN(4);
+        __data_start = .;
+        *(.sdata .sdata.*) *(.data .data.*)
+        . = ALIGN(4);
+        __data_end = .;
+    } >ram AT>flash
+
+    __data_load_ptr = LOADADDR(.data);
+
+At early startup, .data is loaded from flash in ram and bss is cleared:
+
+.. code-block:: c
+
+  extern uint32_t __data_load_ptr, __data_start, __data_end, __bss_start, __bss_end;
+
+  // Copy data
+  uint32_t *src = &__data_load_ptr;
+  uint32_t *dst = &__data_start;
+  while (dst < &__data_end) {
+    *dst++ = *src++;
+  }
+
+  // Zero-initialize .bss
+  dst = &__bss_start;
+  while (dst < &__bss_end) {
+    *dst++ = 0;
+  }
+
+Now, each time the board is started, it prints
+
+> Hello from RISC-V implementation running on Pico2!
