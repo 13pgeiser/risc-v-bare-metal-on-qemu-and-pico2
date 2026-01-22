@@ -2,8 +2,8 @@
 Bare Metal RISC-V, QEMU, GCC and Pico 2
 #######################################
 
-:date: 2025-01-18 19:00
-:modified: 2025-01-18 19:00
+:date: 2026-01-18 19:00
+:modified: 2026-01-18 19:00
 :tags: risc-v, qemu, gcc, pico2
 :authors: Pascal Geiser
 :summary: Minimal examples with GCC for RISC-V
@@ -55,7 +55,7 @@ To have it in a more human readable form, *dtc* can convert it in dts format:
 
 Currently, the interesting section is:
 
-.. code-block::
+.. code-block:: ld
 
 	memory@80000000 {
 		device_type = "memory";
@@ -85,7 +85,7 @@ To compile it, we need a small linker script that will explain to the linker whe
 
 Note that the ram section matches the memory discovered in the first step.
 
-.. code-block::
+.. code-block:: ld
 
     OUTPUT_FORMAT("elf32-littleriscv", "elf32-littleriscv", "elf32-littleriscv")
     OUTPUT_ARCH(riscv)
@@ -167,7 +167,7 @@ And in a second terminal:
 
 Which will connect with gdb to the stopped binary and dump the memory at 0x80000000 (RAM)
 
-.. code-block::
+.. code-block:: gdb
 
     ...
     0x00001000 in ?? ()
@@ -179,7 +179,7 @@ Then in the same gdb run:
  * 'ctrl-c': to break
  * 'info register pc' (or 'i r pc'): to show the current program counter
 
-.. code-block::
+.. code-block:: gdb
 
     (gdb) c
     Continuing.
@@ -266,7 +266,7 @@ Returning from main will call the semihosting code SYS_EXIT and stop QEMU.
 
 In the dts file, there a description for a serial port:
 
-.. code-block::
+.. code-block:: dtc
 
     serial@10000000 {
         interrupts = <0x0a>;
@@ -314,7 +314,7 @@ The c code now implements a uart_write function and calls it with the string to 
 
 Result:
 
-.. code-block::
+.. code-block:: bash
 
     text    data     bss     dec     hex filename
      163    3933       0    4096    1000 06.elf
@@ -388,7 +388,7 @@ chapter 5.9.
 
 The linker script is used to place it at the beginning of the binary:
 
-.. code-block::
+.. code-block:: ld
 
     .text : {
         KEEP (*(.bootloader_metadata))
@@ -508,7 +508,7 @@ Dropping the program 08.uf2 on the RP2350 will trigger the start of the program:
 
 The linker is now slightly different. It adds flash:
 
-.. code-block::
+.. code-block:: ld
 
     flash  (rx) : ORIGIN = 0x10000000, LENGTH = 4M
 
@@ -517,7 +517,7 @@ And the text sections and rodata are now purely in flash.
 For data, the sections is in ram but stored in flash.
 __data_load_ptr contains the source in flash.
 
-.. code-block::
+.. code-block:: ld
 
     .data : {
         . = ALIGN(4);
@@ -550,4 +550,4 @@ At early startup, .data is loaded from flash in ram and bss is cleared:
 
 Now, each time the board is started, it prints
 
-> Hello from RISC-V implementation running on Pico2!
+    Hello from RISC-V implementation running on Pico2!
